@@ -28,7 +28,7 @@ MainWindow::MainWindow(QString yTitle,
     , m_menu(new QMenu)
     , m_hideButtons(new QAction(tr("Hide Buttons")))
     , t_menu(new QMenu)
-    , t_show(new QAction(tr("Open Twitter")))
+    , t_show(new QAction(tr("Open Zalo")))
     , t_exit(new QAction(tr("Exit")))
     , downloadProgressBar(new QWidget)
     , bar(new DProgressBar)
