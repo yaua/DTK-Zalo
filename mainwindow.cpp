@@ -15,8 +15,6 @@ MainWindow::MainWindow(QString yTitle,
                        int nWidth,
                        int nHeight,
                        bool tray,
-                       bool nFullScreen,
-                       bool nFixSize,
                        bool nHideButtons,
                        DAboutDialog *dialog,
                        QWidget *parent)
@@ -28,11 +26,9 @@ MainWindow::MainWindow(QString yTitle,
     , btnForward(new DToolButton(titlebar()))
     , btnRefresh(new DToolButton(titlebar()))
     , m_menu(new QMenu)
-    , m_fullScreen(new QAction(tr("Full Screen")))
-    , m_fixSize(new QAction(tr("Fix Size")))
     , m_hideButtons(new QAction(tr("Hide Buttons")))
     , t_menu(new QMenu)
-    , t_show(new QAction(tr("Open Zalo")))
+    , t_show(new QAction(tr("Open Twitter")))
     , t_exit(new QAction(tr("Exit")))
     , downloadProgressBar(new QWidget)
     , bar(new DProgressBar)
@@ -44,7 +40,6 @@ MainWindow::MainWindow(QString yTitle,
     , process(new QProcess)
     , isCanceled(false)
     , mtray(tray)
-    , mFixSize(nFixSize)
     , m_width(nWidth)
     , m_height(nHeight)
 {
@@ -64,27 +59,15 @@ MainWindow::MainWindow(QString yTitle,
     titlebar()->addWidget(btnBack, Qt::AlignLeft);
     titlebar()->addWidget(btnForward, Qt::AlignLeft);
     titlebar()->addWidget(btnRefresh, Qt::AlignLeft);
-    m_fullScreen->setCheckable(true);
-    m_fullScreen->setChecked(nFullScreen);
-    m_fullScreen->setDisabled(nFixSize);
-    m_fixSize->setCheckable(true);
-    m_fixSize->setChecked(nFixSize);
-    m_fixSize->setDisabled(nFixSize);
     m_hideButtons->setCheckable(true);
     m_hideButtons->setChecked(nHideButtons);
     m_hideButtons->setDisabled(nHideButtons);
-    if(!nFixSize)
-    {
-        m_menu->addAction(m_fullScreen);
-        m_menu->addAction(m_fixSize);
-    }
     if(!nHideButtons)
     {
         m_menu->addAction(m_hideButtons);
     }
     titlebar()->setMenu(m_menu);
     titlebar()->setAutoHideOnFullscreen(true);
-    fixSize();
     hideButtons();
     /* TrayIcon */
     t_menu->addAction(t_show);
@@ -94,8 +77,9 @@ MainWindow::MainWindow(QString yTitle,
     m_tray->setIcon(QIcon(":/images/zalo.svg"));
     if(tray)
     {
-        m_tray->show();
+        m_tray->show(); // Show when tray is enabled
     }
+    /*  DownloadProgressBar */
     bar->setFixedSize(250, 8);
     progress->addWidget(bar);
     progress->addSpacing(5);
@@ -118,14 +102,6 @@ MainWindow::MainWindow(QString yTitle,
         m_widget->refresh();
     });
 
-    connect(m_fullScreen, &QAction::triggered, this, [=]()
-    {
-        fullScreen();
-    });
-    connect(m_fixSize, &QAction::triggered, this, [=]()
-    {
-        fixSize();
-    });
     connect(m_hideButtons, &QAction::triggered, this, [=]()
     {
         hideButtons();
@@ -134,20 +110,19 @@ MainWindow::MainWindow(QString yTitle,
     connect(t_show, &QAction::triggered, this, [=]()
     {
         this->activateWindow();
-        fixSize();
     });
     connect(t_exit, &QAction::triggered, this, [=]()
     {
         exit(0);
     });
     connect(m_tray, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
-
     connect(m_widget->getPage()->profile(), &QWebEngineProfile::downloadRequested, this, &MainWindow::on_downloadStart);
 }
 MainWindow::~MainWindow()
 {
     emit sigQuit();
     delete m_widget;
+    delete m_dialog;
     delete m_tray;
 }
 void MainWindow::setIcon(QString yIconPath)
@@ -164,45 +139,6 @@ void MainWindow::setIcon(QString yIconPath)
     {
         qDebug() << yIconPath << "is Not Exists!";
     }
-}
-void MainWindow::fullScreen()
-{
-    if(m_fullScreen->isChecked())
-    {
-        m_fixSize->setChecked(false);
-        m_fixSize->setDisabled(true);
-        m_menu->update();
-        showFullScreen();
-        //DMessageManager::instance()->sendMessage(this, QIcon::fromTheme("dialog-information").pixmap(64, 64), QString(tr("%1Fullscreen Mode")).arg("    "));
-    }
-    else
-    {
-        if(!mFixSize)
-        {
-            m_fixSize->setDisabled(false);
-        }
-        m_menu->update();
-        showNormal();
-        //DMessageManager::instance()->sendMessage(this, QIcon::fromTheme("dialog-information").pixmap(64, 64), QString(tr("%1Windowed Mode")).arg("    "));
-    }
-}
-void MainWindow::fixSize()
-{
-    if(m_fixSize->isChecked())
-    {
-        m_fullScreen->setChecked(false);
-        m_fullScreen->setDisabled(true);
-        m_menu->update();
-        setFixedSize(this->size());
-    }
-    else
-    {
-        m_fullScreen->setDisabled(false);
-        m_menu->update();
-        setMinimumSize(m_width, m_height);
-        setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
-    }
-    fullScreen();
 }
 void MainWindow::hideButtons()
 {
@@ -236,35 +172,20 @@ QString MainWindow::saveAs(QString fileName)
     return nullptr;
 }
 
-void MainWindow::keyPressEvent(QKeyEvent *event)
-{
-    if(!m_fixSize->isChecked())
-    {
-        if(event->key() == Qt::Key_F11)
-        {
-            m_fullScreen->trigger();
-            m_menu->update();
-        }
-        event->accept();
-    }
-}
 void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
 {
     switch(reason)
     {
+        /* Responding to tray click events */
         case QSystemTrayIcon::Trigger:
             this->activateWindow();
-            fixSize();
             break;
         default:
             break;
     }
 }
-
 void MainWindow::on_downloadStart(QWebEngineDownloadItem *item)
 {
-    if(mutex.tryLock())
-    {
         QString fileName = QFileInfo(item->path()).fileName();
         QString filePath = saveAs(fileName);
         if(filePath.isEmpty())
@@ -273,7 +194,6 @@ void MainWindow::on_downloadStart(QWebEngineDownloadItem *item)
         }
         item->setPath(filePath);
         filePath = QFileInfo(item->path()).absoluteFilePath();
-
         connect(item, &QWebEngineDownloadItem::downloadProgress, this, &MainWindow::on_downloadProgress);
         connect(item, &QWebEngineDownloadItem::finished, this, [=]()
         {
@@ -297,15 +217,11 @@ void MainWindow::on_downloadStart(QWebEngineDownloadItem *item)
         message->setMessage(QString(tr("%1Start downloading %2")).arg("    ").arg(fileName));
         DMessageManager::instance()->sendMessage(this, message);
         item->accept();
+        /* DownloadProgressBar*/
         isCanceled = false;
         resume->hide();
         pause->show();
         this->message->show();
-    }
-    else
-    {
-        DMessageManager::instance()->sendMessage(this, QIcon::fromTheme("dialog-cancel").pixmap(64, 64), QString(tr("%1Wait for previous download to complete!")).arg("    "));
-    }
 }
 
 void MainWindow::on_downloadProgress(qint64 bytesReceived, qint64 bytesTotal)
@@ -318,9 +234,8 @@ void MainWindow::on_downloadProgress(qint64 bytesReceived, qint64 bytesTotal)
 
 void MainWindow::on_downloadFinish(QString filePath)
 {
-    mutex.unlock();
     message->hide();
-    if(!isCanceled)
+    if(!isCanceled) // A prompt message will be displayed when the download is complete
     {
         DPushButton *button = new DPushButton(tr("Open"));
         DFloatingMessage *message = new DFloatingMessage(DFloatingMessage::ResidentType);
@@ -328,7 +243,6 @@ void MainWindow::on_downloadFinish(QString filePath)
         message->setMessage(QString("    %1 %2 %3").arg(QFileInfo(filePath).fileName()).arg(tr("download finished.")).arg(tr("Show in file manager?")));
         message->setWidget(button);
         DMessageManager::instance()->sendMessage(this, message);
-
         connect(button, &DPushButton::clicked, this, [=]()
         {
             process->start("dde-file-manager --show-item " + filePath);
@@ -343,6 +257,7 @@ void MainWindow::on_downloadPause(QWebEngineDownloadItem *item)
     resume->show();
     pause->hide();
 }
+
 void MainWindow::on_downloadResume(QWebEngineDownloadItem *item)
 {
     item->resume();
@@ -350,11 +265,11 @@ void MainWindow::on_downloadResume(QWebEngineDownloadItem *item)
     resume->hide();
     pause->show();
 }
+
 void MainWindow::on_downloadCancel(QWebEngineDownloadItem *item)
 {
-    isCanceled = true;
+    isCanceled = true;  // Cancel download
     item->cancel();
-    mutex.unlock();
     message->hide();
-    DMessageManager::instance()->sendMessage(this, QIcon::fromTheme("dialog-error").pixmap(64, 64), QString(tr("%1Download canceled!")).arg("    "));
 }
+

@@ -9,9 +9,7 @@
 #include <QSystemTrayIcon>
 #include <QLayout>
 #include <QProcess>
-#include <QMutex>
 #include "widget.h"
-#include "main.h"
 
 DWIDGET_USE_NAMESPACE
 
@@ -19,13 +17,11 @@ class MainWindow : public DMainWindow
 {
     Q_OBJECT
 public:
-    MainWindow(QString yTitle = DEFAULT_TITLE,
-               QString yUrl = DEFAULT_URL,
-               int nWidth = DEFAULT_WIDTH,
-               int nHeight = DEFAULT_HEIGHT,
+    MainWindow(QString yTitle,
+               QString yUrl,
+               int nWidth,
+               int nHeight,
                bool tray = false,
-               bool nFullScreen = false,
-               bool nFixSize = false,
                bool nHideButtons = false,
                DAboutDialog *dialog = nullptr,
                QWidget *parent = nullptr);
@@ -39,11 +35,11 @@ private:
     DToolButton *btnForward;
     DToolButton *btnRefresh;
     QMenu *m_menu;
-    QAction *m_fullScreen;
-    QAction *m_fixSize;
     QAction *m_hideButtons;
     QMenu *t_menu;
     QAction *t_show;
+    QAction *lightAction;
+    QAction *darkAction;
     QAction *t_exit;
     QWidget *downloadProgressBar;
     DProgressBar *bar;
@@ -53,15 +49,11 @@ private:
     QHBoxLayout *progress;
     DFloatingMessage *message;
     QProcess *process;
-    QMutex mutex;
     bool isCanceled;
-    bool mtray, mFixSize;
+    bool mtray;
     int m_width, m_height;
-    void fullScreen();
-    void fixSize();
     void hideButtons();
     QString saveAs(QString fileName);
-    void keyPressEvent(QKeyEvent *event);
 private slots:
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void on_downloadStart(QWebEngineDownloadItem *item);
